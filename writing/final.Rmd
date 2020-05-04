@@ -1,0 +1,422 @@
+---
+title: Dizzying Dyadics
+subtitle: Differences in Assessing Dyadic Relationships with Automatic and Manual Event Classification 
+author: Tyler Ashoff
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  rmarkdown::pdf_document:
+    fig_caption: yes
+    includes:
+      in_header: preamble-latex.tex
+fontsize: 12pt
+urlcolor: blue
+
+bibliography: refs.bib
+csl: american-sociological-association.csl
+
+abstract: "`r paste(readLines('abstract.txt'), collapse = '\n')`"
+---
+```{python load_pickle, echo=F}
+import pickle
+dys = pickle.load(open("dyads.p", "rb" ))
+```
+```{r setup, echo=F, message=F}
+library(reticulate)
+library(tidyverse)
+library(kableExtra)
+knitr::opts_chunk$set(fig.width=10, fig.height=3, out.extra = "")
+
+build_plots = function(dyads, data, unit, extra_info = ''){
+    plots = vector('list', length(dyads))
+    for(ind in 1 : length(dyads)){
+        dyad = dyads[ind]
+
+        x1 = unlist(data[dyad][[1]][[1]][[1]])
+        x2 = unlist(data[dyad][[1]][[2]][[1]])
+
+        y1 = unlist(data[dyad][[1]][[1]][[2]])
+        y2 = unlist(data[dyad][[1]][[2]][[2]])
+
+        dataset1 = rep('COPDAB', length(x1))
+        dataset2 = rep('Phoenix', length(x2))
+        
+        df = data.frame('x' = c(x1, x2),
+                        'y' = c(y1, y2),
+                        'Dataset' = c(dataset1, dataset2))
+
+        xlabel = ifelse(unit == 'Year', unit, paste(unit,'s since January 1, 1955', sep=''))
+                     #  
+        plotted = df %>%
+            ggplot()+
+            geom_line(aes(x, y, color = Dataset))+
+            xlab(xlabel)+
+            ylab('Scaled Scores')+
+            ggtitle(paste(unit, 'ly values for dyad: ', dyad, extra_info, sep=''))+
+            theme_minimal()+
+            theme(text = element_text(family = 'Times', size = 18))+
+            scale_colour_manual(values = c("dodgerblue4", "firebrick2"))
+
+        plots[[ind]] = plotted
+        #print(plotted)
+        
+    }
+    return(plots)
+}
+corrs = function(df, dtw, unit, caption = ''){
+    table = df%>%
+        rename('Pearson' = 'Pearson Correlation',
+               'pp' = 'Pearson p-value',
+               'Spearman' = 'Spearman Correlation',
+               'sp' = 'Spearman p-value')%>%
+        mutate(Pearson = round(Pearson, 3),
+               pp = format(pp, digits = 3),
+               Spearman = round(Spearman, 3),
+               sp = format(sp, digits = 3),
+               dtw = format(dtw, digits = 3))%>%
+        select(Dyad, Pearson, pp, Spearman, sp, dtw)%>%
+        rename(rho = Pearson, 'p-value' = pp,
+               rho = Spearman, 'p-value' = sp,
+               'normalized' = dtw)%>%
+        kable('latex', booktabs = T,
+              caption = paste(unit, "ly Correlations", caption, sep = '')) %>%
+        add_header_above(c('','Pearson' = 2, 'Spearman' = 2, 'DTW'=1))%>%
+        kable_styling(latex_options = c("hold_position", "striped"))%>%
+        column_spec(c(2, 4, 6), bold = T)
+    return(table)
+}
+```
+```{python plot_corrs_extract, echo=F}
+dyads = list(dys['plot_month'].keys())
+plot_year = dys['plot_year']
+
+plot_month = dys['plot_month']
+plot_month_2 = dys['plot_month_2']
+plot_month_3 = dys['plot_month_3']
+plot_month_6 = dys['plot_month_6']
+
+plot_week = dys['plot_week']
+plot_week_2 = dys['plot_week_2']
+plot_week_3 = dys['plot_week_3']
+
+corrs_year  = dys['corrs_year']
+
+corrs_month = dys['corrs_month']
+corrs_month_2 = dys['corrs_month_2']
+corrs_month_3 = dys['corrs_month_3']
+corrs_month_6 = dys['corrs_month_6']
+
+corrs_week = dys['corrs_week']
+corrs_week_2 = dys['corrs_week_2']
+corrs_week_3 = dys['corrs_week_3']
+
+dtws_year = dys['dtws_year']['dtw']
+
+dtws_month = dys['dtws_month']['dtw']
+dtws_month_2 = dys['dtws_month_2']['dtw']
+dtws_month_3 = dys['dtws_month_3']['dtw']
+dtws_month_6 = dys['dtws_month_6']['dtw']
+
+dtws_week = dys['dtws_week']['dtw']
+dtws_week_2 = dys['dtws_week_2']['dtw']
+dtws_week_3 = dys['dtws_week_3']['dtw']
+```
+```{r plot_cor, echo=F}
+corrs_year = corrs(py$corrs_year, py$dtws_year, 'Year',
+                   caption = '\\label{tab:corrs_year}')
+
+corrs_month = corrs(py$corrs_month, py$dtws_month, 'Month',
+                    caption = '\\label{tab:corrs_month}')
+corrs_month_2 = corrs(py$corrs_month_2, py$dtws_month_2, 'Month',
+                      caption = ' - 2 Month Average')
+corrs_month_3 = corrs(py$corrs_month_3, py$dtws_month_3, 'Month',
+                      caption = ' - 3 Month Average')
+corrs_month_6 = corrs(py$corrs_month_6, py$dtws_month_6, 'Month',
+                      caption = ' - 6 Month Average \\label{tabs:corrs_month_6}')
+
+corrs_week = corrs(py$corrs_week, py$dtws_week, 'Week')
+corrs_week_2 = corrs(py$corrs_week_2, py$dtws_week_2, 'Week',
+                     caption = ' - 2 Week Average')
+corrs_week_3 = corrs(py$corrs_week_3, py$dtws_week_3, 'Week',
+                     caption = ' - 3 Week Average')
+
+plot_year = build_plots(py$dyads, py$plot_year, 'Year')
+
+plot_month = build_plots(py$dyads, py$plot_month, 'Month')
+plot_month_2 = build_plots(py$dyads, py$plot_month_2, 'Month',
+                           ' - 2 Month Average')
+plot_month_3 = build_plots(py$dyads, py$plot_month_3, 'Month',
+                           ' - 3 Month Average')
+plot_month_6 = build_plots(py$dyads, py$plot_month_6, 'Month',
+                           ' - 6 Month Average')
+
+plot_week = build_plots(py$dyads, py$plot_week, 'Week')
+plot_week_2 = build_plots(py$dyads, py$plot_week_2, 'Week',
+                          ' - 2 Week Average')
+plot_week_3 = build_plots(py$dyads, py$plot_week_3, 'Week',
+                          ' - 3 Week Average')
+
+```
+
+# Introduction {#intro}
+
+Dyadic relationships are important to understanding international relations. Tracking how countries respond to each other and exogenous shocks is critical to understanding what drives their interactions. To make this analysis possible there needs to be a consistent and reliable source for measuring these relationships. Event databases seek to fill this role by classifying events and scoring them based on the conflictual or cooperative nature of each event. Historically these events were human coded but more recently they are automated by performing text analysis on news stories.
+
+How accurately each of these methods classify events is an ongoing topic of research. As is defining the scales on which the intensity of the events is measured. This study though, does not seek to compare these databases to ground truth. Instead it examines the agreement between human coded and machine coded datasets in measuring the dyadic relationships of 6 countries from 1955 to 1978. This agreement is measured using the Pearson and Spearman correlations and the dynamic time warping distance to capture similarity between signals despite possible misalignment. Conducting this analysis at varying time scales offers insight to the effect of granularity.
+
+Ideally, this research can be used to make more informed decisions about event database usage and understand the conditions for agreement between human and machine coded datasets.
+
+# Data {#data}
+
+Two conflict datasets are used in this study, one manually coded and another automatically coded. While, these records contain more detailed information about events, this study only uses four fields: Actor, Target, Score and Date. The Actor and Target variables for assessing membership in dyadic relationships, Score for assessing the intensity of event, and Date to track the relationship overtime.
+
+The manually coded dataset is the COPDAB dataset developed by Edward Azar covering the years 1948 to 1978 [@azar]. The original paper discusses the training of these human coders in more detail. Each event is scored on a 1 to 15 scale, with 1 representing a major governmental program and 15 representing the highest level of structural violence. These values are weighted using the international weighting scale described in Azar's paper [@azar_weight]. These weightings are as shown in Table \ref{azar_weight}, with two modifications. Scale values 9 to 15 uses negative weights to indicate conflict and 8 is set 0 instead of 1 to better represent neutrality.
+
+```{r azar weighting, echo=F}
+df = data.frame(Scale = as.character(seq(1,15)),
+                Weight = c(92, 47, 31, 27, 14, 10, 6, 0, -6, -16, -29, -44, -50, -65, -102))
+t(df)%>%
+    kable('latex', booktabs = T,
+          caption = 'Augmented International Event Weighting \\label{azar_weight}') %>%
+    kable_styling(latex_options = c("hold_position", "striped"))
+```
+
+The automatically coded dataset is the Cline Center Historical Phoenix Event Data NYT 1945-2005 [@phoenix]. These data are collected using the PETRARCH-2 software to extract event information from news stories. The scoring for these events is based on the Golstein scale. A -10 to 8.3 scale with -10 representing a military attack, 0 representing a neutral event, and 8.3 representing military assistance [@golstein].
+
+The weighting of each of each scale was decided by a panel of judges asked to weight the relative intensity of events. While not discussed at length here, more information may be found in the original papers by Golstein and Azar [@golstein] [@azar].
+
+Both of these datasets are chosen because they are well established and have a long overlapping period. While the datasets overlap from 1948-1978, the period of study is restricted to 1955-1978. This period is chosen because post-war reconstruction is generally considered complete in 1955 and it is the first full year the German Democratic Republic was a sovereign country, as discussed in Pollins' "Does Trade Still Follow the Flag?" [@pollins].
+
+## Manipulations of the data
+
+The score data are scaled and missing data are mean imputed. While the techniques discussed in [subsection Statistical Techniques](#stattech) are invariant to scale, this manipulation made visualization of the data much cleaner. It is true that the magnitude of the dynamic time warping distance is affected by scale, however the rank order of these distances is not. Since the rank order is of primary concern, the change in magnitude associated with this transformation is not consequential.
+
+Complete cases are ensured in the yearly assessment of dyadic relationships thanks to the [Dyad Selection](#dyad_selection) process. However, this is not ensured for the Monthly and Weekly analyses and their associated simple moving averages. The techniques require the same number of observations in each time series, so mean imputation was used to fill missing values. While there are significant potential issues with mean imputation, more complex methods such as MICE are left for future analysis. Issues arising from missing data are especially pronounced as the level of aggregation decreased, as seen in the [subsection Monthly Dyads](#monthly).
+
+# Methods {#methods}
+
+## Dyad Selection {#dyad_selection}
+
+This investigation focuses on six states: USA, USSR, China, Canada, East-Germany, and West-Germany. The dyadic relationships between these countries are chosen based on data availability. If both datasets have at least one observation per year for a given dyad (before imputation), this dyad is included in the analysis. An observation is considered part of a dyad, say USA-USSR, only when the actor is the USA and the target is the USSR or vice versa. Domestic events when the target and actor are the same are not included. The selected dyads are as seen in Table \ref{tab:dyads}.
+
+```{r dyadics, echo=F}
+df = data.frame('Dyads' = py$dyads)
+df%>%
+    mutate(Dyads = gsub(' ', ' - ', gsub("\\[|\\]|\\'", '', Dyads)))%>%
+    kable('latex', booktabs = T,
+          caption = 'Dyads included in analysis \\label{tab:dyads}') %>%
+    kable_styling(latex_options = c("hold_position"))
+```
+
+These dyadic relationships are analyzed at varying levels of granularity. Each dyad in Table \ref{tab:dyads} is assessed at the levels described in Table \ref{tab:granularity}.
+
+```{r time_frames, echo=F}
+df = data.frame('Time frame' = c('Year',
+                                 '6 Month Simple Moving Average',
+                                 '3 Month Simple Moving Average',
+                                 '2 Month Simple Moving Average',
+                                 'Month',
+                                 '3 Week Simple Moving Average',
+                                 '2 Week Simple Moving Average',
+                                 'Week'))
+df%>%
+    kable('latex', booktabs = T,
+          caption = 'Time frames included in dyadic analysis \\label{tab:granularity}') %>%
+    kable_styling(latex_options = c("hold_position"))
+```
+
+For window size $n$, the simple moving averages described in Table \ref{tab:granularity} are an average of the current time step and the proceeding $n-1$ time steps. For example, the two week average is an average of the current week and the previous week, the six month average is an average of the current month and the 5 months preceding. The initial observations, where the window could not be calculated fully, use only the data available. For example, while calculating the six month averages, the window for March 1955 only includes January, February, and March.
+
+## Statistical Techniques {#stattech}
+To assess the similarity of the time series, three metrics are employed: Pearson correlation, Spearman correlation, and Dynamic Time Warping (DTW). The traditional Pearson correlation is of primary interest, however Spearman correlation and DTW are included to investigate non-linearity and data shifts.
+
+Pearson correlation is defined as follows:
+
+$$
+\rho_{X,Y} = \frac{cov(X,Y)}{\sigma_X \sigma_Y}
+$$
+
+where $cov()$ is the covariance and $\sigma$ is the standard deviation of the respective datasets.
+
+Spearman correlation is similar to the Pearson correlation, but instead of using the data directly, it calculates the Pearson correlation on the rank values of the datasets.
+
+DTW is especially useful for comparing signals that may vary in time and speed, which is especially useful for this inquiry because event alignment is not guaranteed [@dtw]. In contrast with the Pearson correlation, this property allows for assessment of similarity in the face of non-linearity. While the algorithm is not detailed here, the distance is essentially a cumulative squared distance between points with optimized pairings. Importantly, this cumulative distance is dependent on the number of points in the time series. To make comparison across varying granularities, the DTW distance presented is normalized by the number of points in each time series.
+
+The Pearson and Spearman correlations fall in an easily interpretable range $[-1, 1]$. With $1$ indicating total linear correlation, $0$ no linear correlation, and $-1$ total negative correlation. DTW distances do not have an analogous scale, instead they have the range, $[0, \infty)$ with no universal thresholds for assessing the quality of alignment. Instead, comparison of the distances to each other determines relative similarity, with smaller values indicating increasing agreement.
+
+# Results {#results}
+
+Presented in this section is a subset of the full analysis. While analysis is performed on every time frame described in Table \ref{tab:granularity}, only the analysis of yearly, monthly, and 6 month average data accompanied by selected plots are discussed. These time frames are illustrative of the findings and will suffice in the place of an exhaustive discussion. A full accounting of the correlations and the associated time series plots can be found in [Appendix](#appendix) [A](#A) and [B](#B) respectively.
+
+## Yearly Dyads
+
+The yearly dyadic relationships are the primary interest of this study. Presented in Table \ref{tab:corrs_year} are the Pearson and Spearman correlations with their associated p-values and the normalized dynamic time warp distance. While the range of correlation values is fairly large, there is agreement between the datasets for a few dyads. The USA-USSR dyad shows high correlation, and the USSR-China, USSR-Canada, and USA-China dyads have good correlation as well.
+
+`r corrs_year`
+
+Figures \ref{fig:year_top} and \ref{fig:year_bottom} are the time series of the dyads with the highest and lowest correlations respectively. Figure \ref{fig:year_top}, the time series of the USA-USSR dyad, demonstrates the high correlation clearly. The COPDAB and Phoenix datasets are largely in agreement for these two superpowers in the heat of the Cold War. Being able to track this highly visible and contentious relationship is a good sign that under the right conditions, these datasets capture similar dynamics.
+
+```{r fig_year_top, echo=F, fig.cap='Yearly values for USA and USSR \\label{fig:year_top}'}
+print(plot_year[[1]]+ggtitle(''))
+```
+
+Figure \ref{fig:year_bottom} shows the time series of the East and West Germany dyad which has a correlation near 0. However, when examining the graph it appears that the datasets largely agree. Interestingly, the relationship follows a similar trend as the USA-USSR relationship. This should be expected since the two states were highly aligned with the two superpowers.
+
+Figure \ref{fig:year_bottom} highlights a short coming of the correlation coefficients. Some points are shifted between the two datasets, yet the measured relationship exhibited by the time series appear similar. In combination with Figure \ref{fig:year_dtw} this demonstrates a motivation for the use of dynamic time warping as a useful measure.
+
+```{r fig_year_bottom, echo=F, fig.cap = 'Yearly values for East and West Germany \\label{fig:year_bottom}'}
+print(plot_year[[8]]+ggtitle(''))
+```
+
+Figure \ref{fig:year_dtw} shows the time series of the USA-Canada dyad. The datasets appear to disagree more for this dyad than the German dyad, yet there is much higher correlation. The DTW distance reflects this intuition, the value is smaller for the German dyad than the USA-Canada dyad, indicating greater similarity. While this certainly does not prove that DTW is a better measure in all situations, it does highlight potential short comings of analysis of correlations alone.
+
+```{r fig_year_bottom_dtw, echo=F, fig.cap = 'Yearly value for USA and Canada \\label{fig:year_dtw}'}
+print(plot_year[[4]]+ggtitle(''))
+```
+
+## Monthly Dyads {#montly}
+
+While levels of aggregation below one month are examined, the results become increasingly less reliable. At the Monthly level of aggregation the adverse effects of missing data for dyads with lower data density are magnified.
+
+Table \ref{tab:corrs_month} shows a similar ordering of correlation coefficients, with the larger dyads recording higher correlations as before. Figure \ref{fig:month_top} shows that while there is significantly more noise in the signal than at yearly aggregation, the signal is still visible for the two superpowers. It is in Figures \ref{fig:month_bottom} and \ref{fig:month_dtw} that the effects of missing values become apparent. Due to the mean imputation approach, missing values will be filled with 0, the mean for scaled data. In these figures the flat lining effect as missing values become more prevalent is easy to see. Due to this, more advanced imputation techniques are required for reliable results across all dyads at low levels of aggregation.
+
+These examples also serve to highlight the short comings of dynamic time warping. At this monthly aggregation level, it appears that the USSR-Canada similarity far out paces the yearly values. This again is a relic of missing values being imputed to a common value, 0. Because of the flat lining effect, the DTW values likely do not reflect accurately measured relationships. This stresses again how over reliance on a single metric may lead to erroneous conclusions.
+
+`r corrs_month`
+
+```{r fig_month_top, echo=F, fig.cap = 'Monthly values for USA and USSR \\label{fig:month_top}'}
+print(plot_month[[1]]+ggtitle(''))
+```
+```{r fig_month_bottom, echo=F, fig.cap = 'Monthly values for East and West Germany \\label{fig:month_bottom}'}
+print(plot_month[[8]]+ggtitle(''))
+```
+```{r fig_month_dtw, echo=F, fig.cap = 'Monthly value for USSR and Canada \\label{fig:month_dtw}'}
+print(plot_month[[7]]+ggtitle(''))
+```
+
+## Six Month Simple Moving Average Dyads
+
+While monthly aggregation is limited by missing values, it appears that a six month simple moving average effectively mitigates the flat line effect, while increasing granularity compared to yearly aggregation. In Figure \ref{fig:month_6_top}, a similar relationship as the one seen in yearly aggregation is clear. However, the signal becomes much noisier with this increased granularity, and while the flat line effect is less pronounced, it is still present as shown in Figure \ref{fig:month_6_dtw}.
+
+The correlation increases compared to the monthly aggregation, but more interestingly, there is a huge improvement in DTW distance across the board. From inspection of the plots it appears that the two datasets are capturing similar dyadic relationships. The discrepancy between correlation coefficients and dynamic time warping may indicate misalignment. While the datasets capture the relationships, they may be shifted or delayed compared to one another. Another explanation for this increased similarity may be a damped signal. The values from the six month aggregation are confined primarily to a single standard deviation from the mean. Whereas the monthly and yearly values exceeded two or three standard deviations. The improved DTW distance may simply be a reflection of this tighter score distribution. Further analysis is needed to determine which effect is dominant, but is left for future work.
+
+`r corrs_month_6`
+
+```{r fig_month_6_top, echo=F, fig.cap = 'Six month average value for USA and USSR \\label{fig:month_6_top}'}
+print(plot_month_6[[1]]+ggtitle(''))
+```
+```{r fig_month_6_bottom, echo=F, fig.cap = 'Six month average value for East and West Germany \\label{fig:month_6_bottom}'}
+print(plot_month_6[[8]]+ggtitle(''))
+```
+```{r fig_month_6_top_dtw, echo=F, fig.cap = 'Six month average value for USSR and Canada \\label{fig:month_6_dtw}'}
+print(plot_month_6[[7]]+ggtitle(''))
+```
+
+# Conclusion {#conclusion}
+
+The yearly dyadic relationships show that there is significant agreement between the COPDAB and Phoenix datasets. While efforts to investigate smaller time frames are inconclusive, the moving average approach shows promise for achieving increased signal clarity and mitigating the effect of missing data. In all cases though, it is apparent that the datasets have higher agreement when more data is available. Recall from the [Dyad Selection Section](#dyad_selection) that for inclusion in analysis the dyads must have at least one observation per year. This is a low bar to clear, but still some dyads were not included in analysis. It is not a surprise that all but one dyad includes either the USA or USSR during the cold war period. With highly observed dyads though, like the USA-USSR, high levels of agreement are possible. However, given the variety of results from the dyads included in this analysis, agreement between the datasets is not guaranteed in all circumstances.
+
+### Note to Prof. Grieco
+I am sorry about blowing the 20 page limit out of the water with my appendices. I kept the body of the paper to 10 pages as you suggested for potential publication, but I wanted to include the other figures in case you feel they might be good additions or substitutions for the figures included.
+
+\newpage
+
+# References
+
+<div id="refs"></div>
+
+\newpage
+
+# Appendix {#appendix}
+
+```{r show_app, echo=F}
+show_app = T
+```
+
+# A: Correlations {#A}
+
+```{r corr_year_app, echo = F}
+if(show_app){corrs_year}
+```
+```{r corr_month_app, echo = F}
+if(show_app){corrs_month}
+```
+```{r corr_month_2_app, echo = F}
+if(show_app){corrs_month_2}
+```
+```{r corr_month_3_app, echo = F}
+if(show_app){corrs_month_3}
+```
+```{r corr_month_6_app, echo = F}
+if(show_app){corrs_month_6}
+```
+```{r corr_week_app, echo = F}
+if(show_app){corrs_week}
+```
+```{r corr_week_2_app, echo = F}
+if(show_app){corrs_week_2}
+```
+```{r corr_week_3_app, echo = F}
+if(show_app){corrs_week_3}
+```
+
+\newpage
+
+# B: Plots {#B}
+```{r plot_year_app, echo = F}
+for(plt in plot_year){
+    if(show_app){
+        print(plt)
+    }
+}
+```
+```{r plot_month_app, echo = F}
+for(plt in plot_month){
+    if(show_app){
+        print(plt)
+    }
+}
+```
+```{r plot_month_app_2, echo = F}
+for(plt in plot_month_2){
+    if(show_app){
+        print(plt)
+    }
+}
+```
+```{r plot_month_app_3, echo = F}
+for(plt in plot_month_3){
+    if(show_app){
+        print(plt)
+    }
+}
+```
+```{r plot_month_6_app, echo = F}
+for(plt in plot_month_6){
+    if(show_app){
+        print(plt)
+    }
+}
+```
+```{r plot_week_app, echo = F}
+for(plt in plot_week){
+    if(show_app){
+        print(plt)
+    }
+}
+```
+```{r plot_week_app_2, echo = F}
+for(plt in plot_week_2){
+    if(show_app){
+        print(plt)
+    }
+}
+```
+```{r plot_week_app_3, echo = F}
+for(plt in plot_week_3){
+    if(show_app){
+        print(plt)
+    }
+}
+```
+
+
